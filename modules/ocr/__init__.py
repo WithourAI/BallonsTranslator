@@ -359,3 +359,34 @@ if platform.system() == 'Windows' and platform.version() >= '10.0.10240.0':
 
     else:
         LOGGER.warning(f'No supported language packs found for windows, Windows OCR will be unavailable.')
+
+
+from .stariver_ocr import StariverOCR
+@register_OCR('stariver_ocr')
+class OCRStariver(OCRBase):
+    params = {
+        'token': '',
+        'description': '星河云(团子翻译器) API'
+    }
+
+    def __init__(self, **params) -> None:
+        super().__init__(**params)
+        self.client = StariverOCR(self.params['token'])
+
+    def _ocr_blk_list(self, img: np.ndarray, blk_list: List[TextBlock]):
+        im_h, im_w = img.shape[:2]
+        for blk in blk_list:
+            x1, y1, x2, y2 = blk.xyxy
+            if y2 < im_h and x2 < im_w and \
+                    x1 > 0 and y1 > 0 and x1 < x2 and y1 < y2:
+                blk.text = self.client.ocr(img[y1:y2, x1:x2])
+            else:
+                logging.warning('invalid textbbox to target img')
+                blk.text = ['']
+
+    def ocr_img(self, img: np.ndarray) -> str:
+        return self.client.ocr(img)
+
+    def updateParam(self, param_key: str, param_content):
+        super().updateParam(param_key, param_content)
+        self.client.token = self.params['token']
